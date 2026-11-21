@@ -9,6 +9,20 @@
 #define Root ".."
 
 [Setup]
+#ifdef G435Preview
+AppId={{20558017-09CA-4340-A7BA-9A3946566AF8}
+AppName=BatteryHub G435 Preview
+AppVersion={#AppVersion}
+AppVerName=BatteryHub G435 Preview {#AppVersion}
+AppPublisher=BatteryHub contributors
+DefaultDirName={localappdata}\Programs\BatteryHub G435 Preview
+DisableProgramGroupPage=yes
+DisableDirPage=yes
+PrivilegesRequired=lowest
+OutputDir={#Root}\dist\G435-WirelessBattery
+OutputBaseFilename=BatteryHub-G435-Preview-Setup-{#AppVersion}
+UninstallDisplayName=BatteryHub G435 Preview
+#else
 AppId={{7E0B5C2A-3F4D-4C8E-9B61-2D5A8F1C4E93}
 AppName=BatteryHub
 AppVersion={#AppVersion}
@@ -19,27 +33,32 @@ DisableProgramGroupPage=yes
 DisableDirPage=auto
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+OutputDir={#Root}\dist
+OutputBaseFilename=BatteryHub-Setup-{#AppVersion}
+UninstallDisplayName=BatteryHub
+#endif
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
-OutputDir={#Root}\dist
-OutputBaseFilename=BatteryHub-Setup-{#AppVersion}
 SetupIconFile={#Root}\res\app.ico
 UninstallDisplayIcon={app}\BatteryHub.exe
-UninstallDisplayName=BatteryHub
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 CloseApplications=no
-
-[Tasks]
-Name: "autostart"; Description: "Start BatteryHub when I sign in to Windows"
 
 [Files]
 Source: "{#Root}\BatteryHub.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\third_party\headsetcontrol\headsetcontrol.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "{#Root}\installer\THIRD_PARTY_NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
+
+#ifdef G435Preview
+[Icons]
+Name: "{userprograms}\BatteryHub G435 Preview"; Filename: "{app}\BatteryHub.exe"
+#else
+[Tasks]
+Name: "autostart"; Description: "Start BatteryHub when I sign in to Windows"
 
 [InstallDelete]
 ; Before 1.1.0 the app was called Wireless Battery: remove its exe and Start menu shortcut on upgrade.
@@ -188,3 +207,4 @@ begin
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\WirelessBattery');
   end;
 end;
+#endif
