@@ -23,6 +23,7 @@
 #include "device_aliases.h"
 #include "alert_rules.h"
 #include "devices.h"
+#include "drivers/logitech_g435_0acb.h"
 #include "battery_history.h"
 #include "i18n.h"
 #include "json_output.h"
@@ -1260,7 +1261,10 @@ void ShowMenu() {
     DestroyMenu(m);
     memory_trim::Soon();
     switch (cmd) {
-        case ID_REFRESH: SetEvent(g_refreshEvt); break;
+        case ID_REFRESH:
+            G435Acb::RequestRefresh();
+            SetEvent(g_refreshEvt);
+            break;
         case ID_AUTOSTART: SetAutostart(!AutostartEnabled()); break;
         case ID_HIDE_LAST_KNOWN: SetHideLastKnown(!g_hideLastKnown); break;
         case ID_TRAY_WHEN_EMPTY: SetTrayWhenEmpty(!g_trayWhenEmpty); break;
@@ -1516,6 +1520,9 @@ LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEREMOVECOMPLETE) {
                 if (hdr && hdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
                     auto* iface = reinterpret_cast<const DEV_BROADCAST_DEVICEINTERFACE_W*>(lp);
+                    if (iface->dbcc_classguid == GUID_DEVINTERFACE_HID &&
+                        G435Acb::IsReceiverPath(iface->dbcc_name))
+                        G435Acb::RequestRefresh(true);
                     if (iface->dbcc_classguid == GUID_BTHPORT_DEVICE_INTERFACE) RefreshBluetoothRadioWatches();
                     else if (wp == DBT_DEVICEARRIVAL) RequestMonitor(refresh_policy::Mode::Arrival, DevicesWithLevel());
                 }
@@ -1565,6 +1572,7 @@ LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (wp == TIMER_DEBOUNCE) { KillTimer(h, TIMER_DEBOUNCE); SetEvent(g_refreshEvt); }
             if (wp == TIMER_RESUME) {
                 KillTimer(h, TIMER_RESUME);
+                G435Acb::RequestRefresh();
                 RequestMonitor(refresh_policy::Mode::Resume, std::move(g_awakeBeforeSleep));
                 g_awakeBeforeSleep.clear();
                 SetEvent(g_refreshEvt);
