@@ -24,7 +24,7 @@ The dedicated driver and its audio checks are in [logitech_g435_0acb.cpp](../src
 
 ## Polling and connection behavior
 
-The Realtek bridge briefly pauses both audio and microphone at the receiver. BatteryHub checks both G435 endpoints for Windows audio sessions and peak activity before reads. Active or uninspectable G435 audio defers a read and preserves any last successful value. This check is a snapshot, so audio that starts just after it, or use that Windows does not expose through those APIs, can still encounter the receiver's brief pause. [Measured Realtek audio behavior](https://github.com/deddroid/logitech-g435-battery/blob/be7cc4327c605398d8270dfd005cda0360871161/docs/PROTOCOL.md#why-a-read-interrupts-audio)
+The Realtek bridge briefly pauses both audio and microphone at the receiver. BatteryHub samples peak levels on both G435 endpoints and defers reads if the microphone has an active Windows audio session. A silent playback session can stay open without blocking battery updates. If a stream is active or an endpoint cannot be inspected, BatteryHub preserves any last successful value. Audio that starts after the check, or that Windows does not expose through these APIs, can still encounter the receiver's brief pause. [Measured Realtek audio behavior](https://github.com/deddroid/logitech-g435-battery/blob/be7cc4327c605398d8270dfd005cda0360871161/docs/PROTOCOL.md#why-a-read-interrupts-audio)
 
 A successful reading is cached for 35 minutes to limit bridge activity across the headset's 30-minute idle shutoff window. Failed, offline, and deferred checks retry after at least one minute, on an app poll. **Refresh now**, receiver reattachment, and resume request a fresh check subject to the same audio guard. Unplugging removes the receiver entry and clears its cache. The UI marks the headset disconnected once the receiver confirms a lost link. A timeout or invalid reply has no percentage. Use **Refresh now** while the headset is on and idle to check power changes promptly. [Logitech idle shutoff](https://support.logi.com/hc/en-in/articles/4409389967639-How-to-power-on-and-off-your-G435)
 
@@ -55,7 +55,7 @@ The Windows 11 baseline built from upstream `fd2267d`. Baseline and preview `--l
 
 All 43 Windows test suites passed. The [automated Realtek test](../tests/logitech_g435_0acb_test.cpp) uses documented and captured reply bytes to exercise sequencing, timeout cleanup, malformed and wrong-sequence reports, voltage bounds, caching, audio deferral, and reconnection with scripted I/O. The preview installer and portable ZIP built successfully and their SHA-256 checksums were verified.
 
-The G435 receiver was absent. Its live percentage, comparison with G435 Hub 1.1.1, audio and microphone behavior, USB reattachment, and sleep/resume behavior on this PC remain unverified.
+After the receiver was reconnected, a live `--dump` confirmed interface 3, usage `FFC0:0001`, and 8/515/64-byte report sizes. A playback stream had been blocking reads. While playback was paused, the native driver read 3837 mV (60%) with G435 Hub closed. Playback and microphone continuity, USB reattachment, and sleep/resume still need dedicated tests.
 
 1. Plug in the G435 receiver and turn on the headset in LIGHTSPEED mode. With headset playback and recording stopped, open G435 Hub and choose **Refresh battery**. Record its percentage and the millivolts from its diagnostics. Exit G435 Hub via the tray so it releases the receiver.
 2. Extract the portable copy and run these commands from that folder in PowerShell.

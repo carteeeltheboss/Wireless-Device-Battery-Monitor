@@ -27,7 +27,7 @@ bool IsHeadsetName(IPropertyStore* store, const PROPERTYKEY& key) {
     return match;
 }
 
-bool EndpointIdle(IMMDevice* device) {
+bool NoCaptureSession(IMMDevice* device) {
     ComPtr<IAudioSessionManager2> manager;
     ComPtr<IAudioSessionEnumerator> sessions;
     int count = 0;
@@ -36,20 +36,28 @@ bool EndpointIdle(IMMDevice* device) {
         FAILED(manager->GetSessionEnumerator(sessions.GetAddressOf())) ||
         FAILED(sessions->GetCount(&count))) return false;
 
-    // Treat silence within a running stream as busy, including open mics.
+    // An open microphone must not be interrupted, even if the room is quiet.
     for (int i = 0; i < count; ++i) {
         ComPtr<IAudioSessionControl> session;
         AudioSessionState state{};
         if (FAILED(sessions->GetSession(i, session.GetAddressOf())) ||
             FAILED(session->GetState(&state)) || state == AudioSessionStateActive) return false;
     }
+    return true;
+}
 
-    // Also check the signal meter for activity outside an enumerated session.
+bool EndpointQuiet(IMMDevice* device) {
     ComPtr<AudioMeter> meter;
-    float peak = 0;
-    return SUCCEEDED(device->Activate(kAudioMeterId, CLSCTX_ALL, nullptr,
-                                      reinterpret_cast<void**>(meter.GetAddressOf()))) &&
-           SUCCEEDED(meter->GetPeakValue(&peak)) && peak <= 0.001f;
+    if (FAILED(device->Activate(kAudioMeterId, CLSCTX_ALL, nullptr,
+                                reinterpret_cast<void**>(meter.GetAddressOf())))) return false;
+    // Browsers and chat apps can keep silent render streams open indefinitely.
+    // Check several meter periods before treating playback as idle.
+    for (int i = 0; i < 5; ++i) {
+        if (i) Sleep(50);
+        float peak = 0;
+        if (FAILED(meter->GetPeakValue(&peak)) || peak > 0.001f) return false;
+    }
+    return true;
 }
 
 bool CheckEndpoints() {
@@ -79,7 +87,9 @@ bool CheckEndpoints() {
             !(state & (DEVICE_STATE_ACTIVE | DEVICE_STATE_DISABLED))) return false;
         renderFound |= flow == eRender;
         captureFound |= flow == eCapture;
-        if ((state & DEVICE_STATE_ACTIVE) && !EndpointIdle(device.Get())) return false;
+        if (!(state & DEVICE_STATE_ACTIVE)) continue;
+        if (flow == eCapture && !NoCaptureSession(device.Get())) return false;
+        if (!EndpointQuiet(device.Get())) return false;
     }
     return renderFound && captureFound;
 }
