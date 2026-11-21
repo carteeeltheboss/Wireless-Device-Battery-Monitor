@@ -18,6 +18,7 @@
 #include "device_aliases.h"
 #include "alert_rules.h"
 #include "devices.h"
+#include "drivers/logitech_g435_0acb.h"
 #include "battery_history.h"
 #include "i18n.h"
 #include "json_output.h"
@@ -951,7 +952,10 @@ void ShowMenu() {
     PostMessageW(g_hwnd, WM_NULL, 0, 0);
     DestroyMenu(m);
     switch (cmd) {
-        case ID_REFRESH: SetEvent(g_refreshEvt); break;
+        case ID_REFRESH:
+            G435Acb::RequestRefresh();
+            SetEvent(g_refreshEvt);
+            break;
         case ID_AUTOSTART: SetAutostart(!AutostartEnabled()); break;
         case ID_HIDE_LAST_KNOWN: SetHideLastKnown(!g_hideLastKnown); break;
         case ID_SHOW_DISCONNECTED: SetShowDisconnectedDevices(!g_showDisconnectedDevices); break;
@@ -1096,10 +1100,22 @@ LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (wp) DestroyWindow(h);
             return 0;
         case WM_DEVICECHANGE:
-            if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEREMOVECOMPLETE) RefreshSoon(2500);
+            if (wp == DBT_DEVICEARRIVAL || wp == DBT_DEVICEREMOVECOMPLETE) {
+                const auto* event = reinterpret_cast<const DEV_BROADCAST_HDR*>(lp);
+                if (event && event->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
+                    auto path = std::wstring(reinterpret_cast<const DEV_BROADCAST_DEVICEINTERFACE_W*>(event)->dbcc_name);
+                    for (auto& ch : path) ch = towlower(ch);
+                    if (path.find(L"vid_046d&pid_0acb&mi_03&col03#") != std::wstring::npos)
+                        G435Acb::RequestRefresh(true);
+                }
+                RefreshSoon(2500);
+            }
             return TRUE;
         case WM_POWERBROADCAST:
-            if (wp == PBT_APMRESUMEAUTOMATIC) RefreshSoon(5000);
+            if (wp == PBT_APMRESUMEAUTOMATIC) {
+                G435Acb::RequestRefresh();
+                RefreshSoon(5000);
+            }
             return TRUE;
         case WM_TIMER:
             if (wp == TIMER_DEBOUNCE) { KillTimer(h, TIMER_DEBOUNCE); SetEvent(g_refreshEvt); }

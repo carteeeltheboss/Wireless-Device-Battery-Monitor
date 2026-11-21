@@ -163,6 +163,26 @@ bool HidDev::GetFeature(BYTE reportId, std::vector<BYTE>& out) {
     return HidD_GetFeature(h_, out.data(), (ULONG)out.size()) != FALSE;
 }
 
+int HidDev::GetFeatureTimed(BYTE reportId, std::vector<BYTE>& out, int timeoutMs) {
+    if (!ok() || !overlapped_ || !c_.featLen() || timeoutMs <= 0) return -1;
+    out.assign(c_.featLen(), 0);
+    out[0] = reportId;
+    OVERLAPPED ov{};
+    ov.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (!ov.hEvent) return -1;
+    DWORD received = 0;
+    BOOL done = DeviceIoControl(h_, IOCTL_HID_GET_FEATURE, out.data(), (DWORD)out.size(),
+                                out.data(), (DWORD)out.size(), &received, &ov);
+    if (!done && GetLastError() == ERROR_IO_PENDING) {
+        if (WaitForSingleObject(ov.hEvent, (DWORD)timeoutMs) != WAIT_OBJECT_0) CancelIoEx(h_, &ov);
+        done = GetOverlappedResult(h_, &ov, &received, TRUE);
+    }
+    CloseHandle(ov.hEvent);
+    if (!done || !received || received > out.size() || out[0] != reportId) return -1;
+    out.resize(received);
+    return (int)received;
+}
+
 bool HidDev::GetInputReport(BYTE reportId, std::vector<BYTE>& out) {
     if (!ok() || !c_.inLen()) return false;
     out.assign(c_.inLen(), 0);

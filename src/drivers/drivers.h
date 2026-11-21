@@ -134,6 +134,7 @@ void PollChimera(PollContext& ctx);      // Chimera V2 mouse (3554:F512, before 
 void PollKysona(PollContext& ctx);    // also Pulsar, ATK / VXE, Hitscan Hyperlight
 void PollHyperX(PollContext& ctx);
 void PollLogitechG435(PollContext& ctx);  // G435 headset on the 046D:0ADF dongle (not HID++)
+void PollLogitechG435Acb(PollContext& ctx);  // G435 headset on the 046D:0ACB Realtek dongle
 void PollAstro(PollContext& ctx);  // A50 X / Gen 5 vendor protocol (before generic Logitech)
 void PollLogitech(PollContext& ctx);
 void PollRazer(PollContext& ctx);
