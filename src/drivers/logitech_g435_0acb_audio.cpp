@@ -13,8 +13,14 @@ using Microsoft::WRL::ComPtr;
 
 // MinGW only forward-declares IAudioMeterInformation. GetPeakValue is its
 // first method after IUnknown in the Windows SDK interface.
-struct AudioMeter : IUnknown {
-    virtual HRESULT STDMETHODCALLTYPE GetPeakValue(float* peak) = 0;
+struct AudioMeter {
+    struct VTable {
+        HRESULT (STDMETHODCALLTYPE* queryInterface)(AudioMeter*, REFIID, void**);
+        ULONG (STDMETHODCALLTYPE* addRef)(AudioMeter*);
+        ULONG (STDMETHODCALLTYPE* release)(AudioMeter*);
+        HRESULT (STDMETHODCALLTYPE* getPeakValue)(AudioMeter*, float*);
+    };
+    const VTable* vtable;
 };
 constexpr GUID kAudioMeterId{0xc02216f6, 0x8c67, 0x4b5b, {0x9d, 0x00, 0xd0, 0x08, 0xe7, 0x3e, 0x00, 0x64}};
 
@@ -47,15 +53,16 @@ bool NoCaptureSession(IMMDevice* device) {
 }
 
 bool EndpointQuiet(IMMDevice* device) {
-    ComPtr<AudioMeter> meter;
+    ComPtr<IUnknown> meter;
     if (FAILED(device->Activate(kAudioMeterId, CLSCTX_ALL, nullptr,
                                 reinterpret_cast<void**>(meter.GetAddressOf())))) return false;
     // Browsers and chat apps can keep silent render streams open indefinitely.
     // Check several meter periods before treating playback as idle.
+    auto* audioMeter = reinterpret_cast<AudioMeter*>(meter.Get());
     for (int i = 0; i < 5; ++i) {
         if (i) Sleep(50);
         float peak = 0;
-        if (FAILED(meter->GetPeakValue(&peak)) || peak > 0.001f) return false;
+        if (FAILED(audioMeter->vtable->getPeakValue(audioMeter, &peak)) || peak > 0.001f) return false;
     }
     return true;
 }
